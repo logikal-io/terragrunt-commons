@@ -9,6 +9,21 @@ locals {
   organization_id = replace(local.config.organization, ".", "-")
   project_id = "${local.config.project}-${local.organization_id}"
 
+  # Local module sources
+  working_dir = ".terragrunt-cache/config_hash/module_hash"
+  module_source_dir = pathexpand("~/.terragrunt-local-sources")
+  module_source_groups = [
+    for module_source_group in fileset(local.module_source_dir, "*.yml") :
+      yamldecode(file("${local.module_source_dir}/${module_source_group}"))
+  ]
+  module_sources = {
+    for remote_source, local_source in merge(local.module_source_groups...) :
+      remote_source => run_cmd(
+        "--terragrunt-quiet",
+        "realpath", "-m", "--relative-to=${local.working_dir}", pathexpand(local_source)
+      )
+  }
+
   # Providers
   provider_config = {
     google = {
@@ -46,6 +61,20 @@ locals {
 terraform {
   source = "${path_relative_from_include()}///"
   include_in_copy = [".terraform-version"]
+
+  before_hook "use_local_module_sources" {
+    commands = (
+      get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false) ?
+      ["init", "plan", "apply", "destroy"] : []
+    )
+    execute = flatten([
+      "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
+      join(";", [
+        for remote_source, local_source in local.module_sources :
+          "s|(source = \")${remote_source}//([^?]*)(\\?[^\"]*)*\"|\\1${local_source}/\\2\"|g"
+      ]), "{}", ";",
+    ])
+  }
 }
 
 remote_state {
