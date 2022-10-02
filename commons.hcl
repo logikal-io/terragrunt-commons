@@ -9,7 +9,20 @@ locals {
   organization_id = replace(local.config.organization, ".", "-")
   project_id = "${local.config.project}-${local.organization_id}"
 
+  # Credentials
+  # Note: we only need google_credentials because the GCS remote state backend doesn't support
+  # access tokens at the moment (see https://github.com/gruntwork-io/terragrunt/issues/2287)
+  google_credentials = pathexpand("~/.config/gcloud/terraform/${local.organization_id}.json")
+  google_access_token = run_cmd(
+    "--terragrunt-quiet", "gcloud", "auth", "print-access-token",
+    "--configuration", local.organization_id,
+  )
+  github_credentials = pathexpand("~/.config/gh/hosts.yml")
+  dnsimple_credentials = pathexpand("~/.dnsimple/credentials/${local.organization_id}.yml")
+
   # Local module sources
+  # Note: working_dir is hardcoded because there seems to be no way to get this value
+  # programmatically (see https://github.com/gruntwork-io/terragrunt/issues/2283)
   working_dir = ".terragrunt-cache/config_hash/module_hash"
   module_source_dir = pathexpand("~/.terragrunt-local-sources")
   module_source_groups = [
@@ -29,16 +42,24 @@ locals {
     google = {
       source = "hashicorp/google"
       config = {
+        access_token = local.google_access_token
         project = local.project_id
         region = local.config.region
       }
     }
     github = {
       source = "integrations/github"
-      config = {
-        token = yamldecode(file("~/.config/gh/hosts.yml"))["github.com"]["oauth_token"]
+      config = contains(keys(local.config.providers), "github") ? {
+        token = yamldecode(file(local.github_credentials))["github.com"]["oauth_token"]
         owner = local.organization_id
-      }
+      } : {}
+    }
+    dnsimple = {
+      source = "dnsimple/dnsimple"
+      config = (
+        contains(keys(local.config.providers), "dnsimple") ?
+        yamldecode(file(local.dnsimple_credentials)) : {}
+      )
     }
   }
   provider_blocks = trimspace(join("", [
@@ -65,7 +86,7 @@ terraform {
   before_hook "use_local_module_sources" {
     commands = (
       get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false) ?
-      ["init", "plan", "apply", "destroy"] : []
+      ["init", "validate", "plan", "apply", "destroy"] : []
     )
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
@@ -80,6 +101,7 @@ terraform {
 remote_state {
   backend = "gcs"
   config = {
+    credentials = local.google_credentials
     project = local.project_id
     bucket = "terraform-state-${local.project_id}"
     location = local.config.region

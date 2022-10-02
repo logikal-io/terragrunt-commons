@@ -28,6 +28,16 @@ Additionally, the common configuration extends the project-specific configuratio
 the providers), so that you can simply refer to them as ``var.organization``, ``var.region``,
 ``var.project_id`` and so on in your Terraform configuration files.
 
+Credentials
+-----------
+The credentials for the Google Cloud Storage backend and the Google provider are extracted from the
+Google Cloud CLI user credentials (from the ``organization_id`` configuration).
+
+The credentials for the GitHub provider are extracted from the GitHub CLI user credentials.
+
+The credentials for the DNSimple provider are read from
+``~/.dnsimple/credentials/${organization_id}.yml``.
+
 Local Module Sources
 --------------------
 You can simplify module development by creating a yaml file containing the mapping of your remote
@@ -46,3 +56,15 @@ Terragrunt to replace remote module sources with local ones before running a com
 
     TERRAGRUNT_USE_LOCAL_SOURCES=1 terragrunt init
     TERRAGRUNT_USE_LOCAL_SOURCES=1 terragrunt apply
+
+You can also create an alias to make it easier to use local module sources for a run:
+
+.. code-block:: shell
+
+    alias tgl='TERRAGRUNT_USE_LOCAL_SOURCES=1 terragrunt'
+    tgl init
+    tgl apply
+
+License
+-------
+This repository is licensed under the MIT open source license.
