@@ -9,7 +9,7 @@ First, clone the repository:
 
 .. code-block:: shell
 
-    git clone git@github.com:logikal-io/terragrunt-commons.git@v{release} ~/.terragrunt
+    git clone git@github.com:logikal-io/terragrunt-commons.git@{release} ~/.terragrunt
 
 Next, include the cloned ``commons.hcl`` in your ``terragrunt.hcl`` Terragrunt configuration file:
 
