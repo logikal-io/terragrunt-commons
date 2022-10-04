@@ -22,7 +22,9 @@ locals {
 
   # Local module sources
   # Note: working_dir is hardcoded because there seems to be no way to get this value
-  # programmatically (see https://github.com/gruntwork-io/terragrunt/issues/2283)
+  # programmatically (see https://github.com/gruntwork-io/terragrunt/issues/2283), additionally,
+  # this logic fails when Terragrunt does not run in the cache folder and we can't check if it
+  # exists either (see https://github.com/hashicorp/terraform/issues/25316)
   working_dir = ".terragrunt-cache/config_hash/module_hash"
   module_source_dir = pathexpand("~/.terragrunt-local-sources")
   module_source_groups = [
@@ -96,6 +98,11 @@ terraform {
       ]), "{}", ";",
     ])
   }
+
+  after_hook "tflint" {
+    commands = ["validate"]
+    execute = ["tflint", "--color", "."]
+  }
 }
 
 remote_state {
@@ -120,7 +127,7 @@ inputs = merge(
 terragrunt_version_constraint = "= ${local.terragrunt_version}"
 terraform_version_constraint = "= ${local.terraform_version}"
 
-# Terraform configuration
+# Terraform and TFLint configuration
 generate "providers" {
   path = "providers.tf"
   if_exists = "overwrite"
@@ -134,5 +141,23 @@ generate "providers" {
     }
 
     ${local.provider_config_blocks}
+  EOT
+}
+generate "tflint_configuration" {
+  path = ".tflint.hcl"
+  if_exists = "overwrite"
+  contents = <<-EOT
+    config {
+      module = true
+    }
+    plugin "terraform" {
+      enabled = true
+      preset = "all"
+    }
+    plugin "google" {
+      enabled = true
+      version = "0.20.0"
+      source = "github.com/terraform-linters/tflint-ruleset-google"
+    }
   EOT
 }
