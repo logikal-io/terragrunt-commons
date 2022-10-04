@@ -1,11 +1,25 @@
 Terragrunt Commons
 ==================
-This repository contains our common Terragrunt configuration files. You can simpy clone the
-repository and include the ``commons.hcl`` file in your Terragrunt configuration to benefit from
-the automated remote state and provider management configuration.
+This repository contains our common Terragrunt configuration files, which vastly simplify and
+standardize infrastructure provisioning.
 
-Once included, you must provide a project-specific configuration in a ``config.hcl`` file as
-follows:
+Getting Started
+---------------
+First, clone the repository:
+
+.. code-block:: shell
+
+    git clone git@github.com:logikal-io/terragrunt-commons.git@v{release} ~/.terragrunt
+
+Next, include the cloned ``commons.hcl`` in your ``terragrunt.hcl`` Terragrunt configuration file:
+
+.. code-block:: terraform
+
+    include "commons" {
+        path = pathexpand("~/.terragrunt/commons.hcl")
+    }
+
+Finally, create a project-specific configuration in a ``config.hcl`` file:
 
 .. code-block:: terraform
 
@@ -20,13 +34,15 @@ follows:
       }
     }
 
-Note that an organization suffix will be automatically appended to the project name, so specifying
-that explicitly is not necessary.
+That's it! Your remote state and provider configration will be now automatically managed whenever
+you execute a Terragrunt command.
 
-Additionally, the common configuration extends the project-specific configuration with the
-``organization_id`` and ``project_id`` fields and converts them into input variables (except for
-the providers), so that you can simply refer to them as ``var.organization``, ``var.region``,
-``var.project_id`` and so on in your Terraform configuration files.
+Input Variables
+---------------
+The common configuration extends the project-specific configuration with the ``organization_id``
+and ``project_id`` fields and converts them into input variables, so you can simply refer to them
+as ``var.organization``, ``var.region``, ``var.project_id`` and so on in your Terraform
+configuration files.
 
 Credentials
 -----------
@@ -46,11 +62,10 @@ create a ``logikal.yml`` file as follows:
 
 .. code-block:: yaml
 
-    ---
     github.com/logikal-io/terraform-modules: ~/Projects/logikal/terraform-modules
 
-Afterwards you can simply use the ``TERRAGRUNT_USE_LOCAL_SOURCES`` environment variable to force
-Terragrunt to replace remote module sources with local ones before running a command:
+Afterwards you can simply use the ``TERRAGRUNT_USE_LOCAL_SOURCES`` environment variable to make
+Terragrunt replace remote module sources with local ones before running a command:
 
 .. code-block:: shell
 
@@ -64,6 +79,12 @@ You can also create an alias to make it easier to use local module sources for a
     alias tgl='TERRAGRUNT_USE_LOCAL_SOURCES=1 terragrunt'
     tgl init
     tgl apply
+
+Linting
+-------
+Whenever you execute the ``validate`` command Terragrunt will additionally run `TFLint
+<https://github.com/terraform-linters/tflint>`_ against your configuration files too. Note that
+TFLint must be installed for this to work.
 
 License
 -------
