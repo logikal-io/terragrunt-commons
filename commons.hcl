@@ -99,6 +99,11 @@ terraform {
     ])
   }
 
+  after_hook "tflint_init" {
+    commands = ["validate"]
+    execute = ["tflint", "--init"]
+  }
+
   after_hook "tflint" {
     commands = ["validate"]
     execute = ["tflint", "--color", "."]
