@@ -13,10 +13,14 @@ locals {
   # Note: we only need google_credentials because the GCS remote state backend doesn't support
   # access tokens at the moment (see https://github.com/gruntwork-io/terragrunt/issues/2287)
   google_credentials = pathexpand("~/.config/gcloud/terraform/${local.organization_id}.json")
-  google_access_token = run_cmd(
+  google_active_account = run_cmd(
+    "--terragrunt-quiet", "gcloud", "auth", "list", "--filter=status:ACTIVE",
+    "--format=value(account)",
+  )
+  google_access_token = length(local.google_active_account) > 0 ? run_cmd(
     "--terragrunt-quiet", "gcloud", "auth", "print-access-token",
     "--configuration", local.organization_id,
-  )
+  ) : ""
   github_credentials = pathexpand("~/.config/gh/hosts.yml")
   dnsimple_credentials = pathexpand("~/.dnsimple/credentials/${local.organization_id}.yml")
 
