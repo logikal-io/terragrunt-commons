@@ -17,6 +17,9 @@ locals {
   google_access_token = local.use_credentials ? run_cmd(
     "--terragrunt-quiet", "gcloud", "auth", "print-access-token",
     "--configuration", local.organization_id,
+    # Note: we disable the output when credentials are unavailable because run_cmd is run even when
+    # local.use_credentials is false (see https://github.com/gruntwork-io/terragrunt/issues/1448)
+    "--verbosity", (local.use_credentials ? "warning" : "none"),
   ) : ""
   github_credentials = pathexpand("~/.config/gh/hosts.yml")
   dnsimple_credentials = pathexpand("~/.dnsimple/credentials/${local.organization_id}.yml")
