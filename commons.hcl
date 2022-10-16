@@ -12,12 +12,9 @@ locals {
   # Credentials
   # Note: we only need google_credentials because the GCS remote state backend doesn't support
   # access tokens at the moment (see https://github.com/gruntwork-io/terragrunt/issues/2287)
+  use_credentials = get_env("TERRAGRUNT_USE_CREDENTIALS", true)
   google_credentials = pathexpand("~/.config/gcloud/terraform/${local.organization_id}.json")
-  google_active_account = run_cmd(
-    "--terragrunt-quiet", "gcloud", "auth", "list", "--filter=status:ACTIVE",
-    "--format=value(account)",
-  )
-  google_access_token = length(local.google_active_account) > 0 ? run_cmd(
+  google_access_token = local.use_credentials ? run_cmd(
     "--terragrunt-quiet", "gcloud", "auth", "print-access-token",
     "--configuration", local.organization_id,
   ) : ""
@@ -43,6 +40,22 @@ locals {
       )
   }
 
+  # Remote state backends
+  remote_state = {
+    gcs = {
+      backend = "gcs"
+      config = {
+        credentials = local.google_credentials
+        project = local.project_id
+        bucket = "terraform-state-${local.project_id}"
+        location = local.config.region
+        prefix = "/"
+      }
+      disable_init = !local.use_credentials
+    }
+  }
+  backend = local.use_credentials ? lookup(local.config, "backend", "gcs") : "local"
+
   # Providers
   provider_config = {
     google = {
@@ -55,7 +68,7 @@ locals {
     }
     github = {
       source = "integrations/github"
-      config = contains(keys(local.config.providers), "github") ? {
+      config = local.use_credentials && contains(keys(local.config.providers), "github") ? {
         token = yamldecode(file(local.github_credentials))["github.com"]["oauth_token"]
         owner = local.organization_id
       } : {}
@@ -63,7 +76,7 @@ locals {
     dnsimple = {
       source = "dnsimple/dnsimple"
       config = (
-        contains(keys(local.config.providers), "dnsimple") ?
+        local.use_credentials && contains(keys(local.config.providers), "dnsimple") ?
         yamldecode(file(local.dnsimple_credentials)) : {}
       )
     }
@@ -119,16 +132,7 @@ terraform {
   }
 }
 
-remote_state {
-  backend = "gcs"
-  config = {
-    credentials = local.google_credentials
-    project = local.project_id
-    bucket = "terraform-state-${local.project_id}"
-    location = local.config.region
-    prefix = "/"
-  }
-}
+remote_state = local.remote_state[local.backend]
 
 inputs = merge(
   { for key, value in local.config : key => value if key != "providers" },
@@ -147,7 +151,7 @@ generate "providers" {
   if_exists = "overwrite"
   contents = <<-EOT
     terraform {
-      backend "gcs" {}
+      backend "${local.backend}" {}
       required_version = "= ${local.terraform_version}"
       required_providers {
         ${local.provider_blocks}
