@@ -12,7 +12,7 @@ locals {
   # Credentials
   # Note: we only need google_credentials because the GCS remote state backend doesn't support
   # access tokens at the moment (see https://github.com/gruntwork-io/terragrunt/issues/2287)
-  use_credentials = get_env("TERRAGRUNT_USE_CREDENTIALS", true)
+  use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
   google_credentials = pathexpand("~/.config/gcloud/terraform/${local.organization_id}.json")
   google_access_token = local.use_credentials ? run_cmd(
     "--terragrunt-quiet", "gcloud", "auth", "print-access-token",
@@ -51,7 +51,9 @@ locals {
         location = local.config.region
         prefix = "/"
       }
-      disable_init = !local.use_credentials
+    }
+    local = {
+      backend = "local"
     }
   }
   backend = local.use_credentials ? lookup(local.config, "backend", "gcs") : "local"
@@ -104,7 +106,7 @@ terraform {
 
   before_hook "use_local_module_sources" {
     commands = (
-      get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false) ?
+      tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false)) ?
       ["init", "validate", "plan", "apply", "destroy"] : []
     )
     execute = flatten([
@@ -132,7 +134,7 @@ terraform {
   }
 }
 
-remote_state = local.remote_state[local.backend]
+remote_state = merge(local.remote_state[local.backend], { disable_init = !local.use_credentials })
 
 inputs = merge(
   { for key, value in local.config : key => value if key != "providers" },
