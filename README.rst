@@ -41,8 +41,8 @@ Input Variables
 ---------------
 The common configuration extends the project-specific configuration with the ``organization_id``
 and ``project_id`` fields and converts them into input variables, so you can simply refer to them
-as ``var.organization``, ``var.region``, ``var.project_id`` and so on in your Terraform
-configuration files.
+as ``var.organization_id``, ``var.project_id``, ``var.organization``, ``var.project`` and so on in
+your Terraform configuration files.
 
 Credentials
 -----------
