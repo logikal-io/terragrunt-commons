@@ -46,19 +46,20 @@ configuration files.
 
 Credentials
 -----------
-The credentials for the Google Cloud Storage backend and the Google provider are extracted from the
-Google Cloud CLI user credentials (from the ``organization_id`` configuration).
+The credentials for the Google Cloud Storage backend and the Google provider are read from
+``$XDG_CONFIG_HOME/gcloud/credentials/${organization_id}.json``. Note that you can also use your
+application default credentials by copying it to this location or by creating a symlink to it.
 
 The credentials for the GitHub provider are extracted from the GitHub CLI user credentials.
 
 The credentials for the DNSimple provider are read from
-``~/.dnsimple/credentials/${organization_id}.yml``.
+``$XDG_CONFIG_HOME/dnsimple/credentials/${organization_id}.yml``.
 
 Local Module Sources
 --------------------
 You can simplify module development by creating a yaml file containing the mapping of your remote
-sources to local sources in the ``~/.terragrunt-local-sources`` folder. For example, you could
-create a ``logikal.yml`` file as follows:
+sources to local sources in the ``$XDG_CONFIG_HOME/terragrunt/local-sources`` folder. For example,
+you could create a ``logikal-io.yml`` file as follows:
 
 .. code-block:: yaml
 

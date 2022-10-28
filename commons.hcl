@@ -10,19 +10,14 @@ locals {
   project_id = "${local.config.project}-${local.organization_id}"
 
   # Credentials
-  # Note: we only need google_credentials because the GCS remote state backend doesn't support
-  # access tokens at the moment (see https://github.com/gruntwork-io/terragrunt/issues/2287)
   use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
-  google_credentials = pathexpand("~/.config/gcloud/terraform/${local.organization_id}.json")
-  google_access_token = local.use_credentials ? run_cmd(
-    "--terragrunt-quiet", "gcloud", "auth", "print-access-token",
-    "--configuration", local.organization_id,
-    # Note: we disable the output when credentials are unavailable because run_cmd is run even when
-    # local.use_credentials is false (see https://github.com/gruntwork-io/terragrunt/issues/1448)
-    "--verbosity", (local.use_credentials ? "warning" : "none"),
-  ) : ""
-  github_credentials = pathexpand("~/.config/gh/hosts.yml")
-  dnsimple_credentials = pathexpand("~/.dnsimple/credentials/${local.organization_id}.yml")
+  config_home = pathexpand(trimsuffix(
+    get_env("XDG_CONFIG_HOME", "${trimsuffix(get_env("HOME"), "/")}/.config"), "/",
+  ))
+
+  google_credentials = "${local.config_home}/gcloud/credentials/${local.organization_id}.json"
+  github_credentials = "${local.config_home}/gh/hosts.yml"
+  dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
 
   # Local module sources
   # Note: working_dir is hardcoded because there seems to be no way to get this value
@@ -30,7 +25,7 @@ locals {
   # this logic fails when Terragrunt does not run in the cache folder and we can't check if it
   # exists either (see https://github.com/hashicorp/terraform/issues/25316)
   working_dir = ".terragrunt-cache/config_hash/module_hash"
-  module_source_dir = pathexpand("~/.terragrunt-local-sources")
+  module_source_dir = "${local.config_home}/terragrunt/local-sources"
   module_source_groups = [
     for module_source_group in fileset(local.module_source_dir, "*.yml") :
       yamldecode(file("${local.module_source_dir}/${module_source_group}"))
@@ -66,7 +61,7 @@ locals {
     google = {
       source = "hashicorp/google"
       config = {
-        access_token = local.google_access_token
+        credentials = local.google_credentials
         project = local.project_id
         region = local.config.region
       }
