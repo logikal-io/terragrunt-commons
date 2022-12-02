@@ -26,10 +26,13 @@ Finally, create a project-specific configuration in a ``config.hcl`` file:
     locals {
       organization = "logikal.io"
       project = "project-name"
-      region = "europe-west6"
+      backend = "gcs"
 
       providers = {
-        google = "~> 4.30"
+        google = {
+          version = "~> 4.44"
+          region = "europe-west6"
+        }
         ...
       }
     }
@@ -49,6 +52,8 @@ Credentials
 The credentials for the Google Cloud Storage backend and the Google provider are read from
 ``$XDG_CONFIG_HOME/gcloud/credentials/${organization_id}.json``. Note that you can also use your
 application default credentials by copying it to this location or by creating a symlink to it.
+
+The credentials for the AWS provider are read from the ``organization_id`` named profile.
 
 The credentials for the GitHub provider are extracted from the GitHub CLI user credentials.
 
