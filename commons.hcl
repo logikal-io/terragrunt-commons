@@ -42,29 +42,54 @@ locals {
   remote_state = {
     gcs = {
       backend = "gcs"
-      config = {
+      config = contains(keys(local.config.providers), "google") ? {
         credentials = local.google_credentials
         project = local.project_id
         bucket = "terraform-state-${local.project_id}"
-        location = local.config.region
+        location = local.config.providers["google"]["region"]
         prefix = "/"
+      } : {}
+    }
+    s3 = {
+      backend = "s3"
+      config = {
+        profile = local.organization_id
+        bucket = (
+          contains(keys(local.config.providers), "aws") ?
+          "terraform-state-${local.config.providers["aws"]["region"]}-${local.organization_id}" :
+          null
+        )
+        key = "${local.project_id}.tfstate"
+        region = (
+          contains(keys(local.config.providers), "aws") ?
+          local.config.providers["aws"]["region"] : null
+        )
+        encrypt = true
+        dynamodb_table = "terraform-state-lock"
       }
     }
     local = {
       backend = "local"
     }
   }
-  backend = local.use_credentials ? lookup(local.config, "backend", "gcs") : "local"
+  backend = local.use_credentials ? local.config["backend"] : "local"
 
   # Providers
   provider_config = {
     google = {
       source = "hashicorp/google"
-      config = {
+      config = local.use_credentials && contains(keys(local.config.providers), "google") ? {
         credentials = local.google_credentials
         project = local.project_id
-        region = local.config.region
-      }
+        region = local.config.providers["google"]["region"]
+      } : {}
+    }
+    aws = {
+      source = "hashicorp/aws"
+      config = local.use_credentials && contains(keys(local.config.providers), "aws") ? {
+        profile = local.organization_id
+        region = local.config.providers["aws"]["region"]
+      } : {}
     }
     github = {
       source = "integrations/github"
@@ -82,10 +107,10 @@ locals {
     }
   }
   provider_blocks = trimspace(join("", [
-    for provider, version in local.config.providers : <<EOT
+    for provider, settings in local.config.providers : <<EOT
     ${provider} = {
       source = "${local.provider_config[provider].source}"
-      version = "${version}"
+      version = "${settings["version"]}"
     }
     EOT
   ]))
@@ -96,6 +121,28 @@ locals {
       ]), "}"
     ])
   ])
+
+  # TFLint
+  tflint_plugins = {
+    google = {
+      version = "0.20.0"
+      source = "github.com/terraform-linters/tflint-ruleset-google"
+    }
+    aws = {
+      version = "0.19.0"
+      source = "github.com/terraform-linters/tflint-ruleset-aws"
+    }
+  }
+  tflint_plugin_blocks = trimspace(join("", [
+    for plugin, settings in local.tflint_plugins : <<-EOT
+    plugin "${plugin}" {
+      enabled = true
+      version = "${settings["version"]}"
+      source = "${settings["source"]}"
+    }
+    EOT
+    if contains(keys(local.config.providers), plugin)
+  ]))
 }
 
 terraform {
@@ -172,10 +219,6 @@ generate "tflint_configuration" {
       enabled = true
       preset = "all"
     }
-    plugin "google" {
-      enabled = true
-      version = "0.20.0"
-      source = "github.com/terraform-linters/tflint-ruleset-google"
-    }
+    ${local.tflint_plugin_blocks}
   EOT
 }
