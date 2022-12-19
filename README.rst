@@ -51,9 +51,13 @@ Credentials
 -----------
 The credentials for the Google Cloud Storage backend and the Google provider are read from
 ``$XDG_CONFIG_HOME/gcloud/credentials/${organization_id}.json``. Note that you can also use your
-application default credentials by copying it to this location or by creating a symlink to it.
+application default credentials by copying it to this location or by creating a symlink to it, or
+you can use our `gcpl <https://github.com/logikal-io/scripts>`_ script, which automatically takes
+care of this.
 
-The credentials for the AWS provider are read from the ``organization_id`` named profile.
+The credentials for the AWS provider are read from the ``organization_id`` named profile. Note that
+you can use our `awsl <https://github.com/logikal-io/scripts>`_ script to populate the named
+credentials in a convenient manner.
 
 The credentials for the GitHub provider are extracted from the GitHub CLI user credentials.
 

@@ -5,7 +5,8 @@ locals {
   terraform_version = trimspace(file("${get_terragrunt_dir()}/.terraform-version"))
 
   # Configuration
-  config = read_terragrunt_config("${get_terragrunt_dir()}/config.hcl").locals
+  child_config = read_terragrunt_config("${get_terragrunt_dir()}/config.hcl").locals
+  config = merge(lookup(local.child_config, "parent", {}), local.child_config)
   organization_id = replace(local.config.organization, ".", "-")
   project_id = "${local.config.project}-${local.organization_id}"
 
@@ -72,7 +73,7 @@ locals {
       backend = "local"
     }
   }
-  backend = local.use_credentials ? local.config["backend"] : "local"
+  backend = local.use_credentials ? local.config.backend : "local"
 
   # Providers
   provider_config = {
