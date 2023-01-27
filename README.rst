@@ -42,10 +42,10 @@ you execute a Terragrunt command.
 
 Input Variables
 ---------------
-The common configuration extends the project-specific configuration with the ``organization_id``
-and ``project_id`` fields and converts them into input variables, so you can simply refer to them
-as ``var.organization_id``, ``var.project_id``, ``var.organization``, ``var.project`` and so on in
-your Terraform configuration files.
+The common configuration extends the project-specific configuration with the ``terragrunt_dir``,
+``organization_id`` and ``project_id`` fields and converts them into input variables, so you can
+simply refer to them as ``var.organization_id``, ``var.project_id``, ``var.organization``,
+``var.project`` and so on in your Terraform configuration files.
 
 Credentials
 -----------

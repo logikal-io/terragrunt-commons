@@ -188,6 +188,7 @@ remote_state = merge(local.remote_state[local.backend], { disable_init = !local.
 inputs = merge(
   { for key, value in local.config : key => value if key != "providers" },
   {
+    terragrunt_dir = get_terragrunt_dir()
     organization_id = local.organization_id
     project_id = local.project_id
   }
