@@ -153,7 +153,10 @@ terraform {
   before_hook "use_local_module_sources" {
     commands = (
       tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false)) ?
-      ["init", "validate", "plan", "apply", "destroy", "import"] : []
+      [
+        "init", "validate", "plan", "apply", "destroy", "import", "output", "refresh", "state",
+        "taint", "untaint",
+      ] : []
     )
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
