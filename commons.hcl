@@ -7,15 +7,24 @@ locals {
   # Configuration
   child_config = read_terragrunt_config("${get_terragrunt_dir()}/config.hcl").locals
   config = merge(lookup(local.child_config, "parent", {}), local.child_config)
-  organization_id = replace(local.config.organization, ".", "-")
-  project_id = "${local.config.project}-${local.organization_id}"
-
-  # Credentials
-  use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
   config_home = pathexpand(trimsuffix(
     get_env("XDG_CONFIG_HOME", "${trimsuffix(get_env("HOME"), "/")}/.config"), "/",
   ))
+  organization_id = replace(local.config.organization, ".", "-")
+  project_id = "${local.config.project}-${local.organization_id}"
+  cli_config = "${local.config_home}/terraform/${local.organization_id}.tf"
 
+  # Commands
+  all_commands = [
+      # Main commands
+      "init", "validate", "plan", "apply", "destroy",
+      # Other commands
+      "console", "fmt", "force-unlock", "get", "graph", "import", "login", "logout", "output",
+      "providers", "refresh", "show", "state", "taint", "test", "untaint", "workspace",
+  ]
+
+  # Credentials
+  use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
   google_credentials = "${local.config_home}/gcloud/credentials/${local.organization_id}.json"
   github_credentials = "${local.config_home}/gh/hosts.yml"
   dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
@@ -150,14 +159,15 @@ terraform {
   source = "${path_relative_from_include()}///"
   include_in_copy = [".terraform-version"]
 
+  extra_arguments "cli_config_file" {
+    commands = fileexists(local.cli_config) ? local.all_commands : []
+    env_vars = {
+      TF_CLI_CONFIG_FILE = local.cli_config
+    }
+  }
+
   before_hook "use_local_module_sources" {
-    commands = (
-      tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false)) ?
-      [
-        "init", "validate", "plan", "apply", "destroy", "import", "output", "refresh", "state",
-        "taint", "untaint",
-      ] : []
-    )
+    commands = tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false)) ? local.all_commands : []
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
       join(";", [
