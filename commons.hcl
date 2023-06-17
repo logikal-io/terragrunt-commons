@@ -86,6 +86,10 @@ locals {
 
   # Providers
   provider_config = {
+    random = {
+      source = "hashicorp/random"
+      config = {}
+    }
     google = {
       source = "hashicorp/google"
       config = local.use_credentials && contains(keys(local.config.providers), "google") ? {
