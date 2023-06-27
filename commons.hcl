@@ -139,11 +139,11 @@ locals {
   # TFLint
   tflint_plugins = {
     google = {
-      version = "0.20.0"
+      version = "0.24.0"
       source = "github.com/terraform-linters/tflint-ruleset-google"
     }
     aws = {
-      version = "0.19.0"
+      version = "0.23.1"
       source = "github.com/terraform-linters/tflint-ruleset-aws"
     }
   }
@@ -193,7 +193,7 @@ terraform {
 
   after_hook "tflint" {
     commands = ["validate"]
-    execute = ["tflint", "--color", "."]
+    execute = ["tflint", "--color"]
   }
 }
 
