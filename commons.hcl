@@ -10,6 +10,7 @@ locals {
   config_home = pathexpand(trimsuffix(
     get_env("XDG_CONFIG_HOME", "${trimsuffix(get_env("HOME"), "/")}/.config"), "/",
   ))
+  subproject = lookup(local.config, "subproject", null)
   organization_id = replace(local.config.organization, ".", "-")
   project_id = "${local.config.project}-${local.organization_id}"
   cli_config = "${local.config_home}/terraform/${local.organization_id}.tf"
@@ -57,7 +58,7 @@ locals {
         project = local.project_id
         bucket = "terraform-state-${local.project_id}"
         location = local.config.providers["google"]["region"]
-        prefix = "/"
+        prefix = "/${local.subproject != null ? local.subproject : ""}"
       } : {}
     }
     s3 = {
@@ -69,7 +70,7 @@ locals {
           "terraform-state-${local.config.providers["aws"]["region"]}-${local.organization_id}" :
           null
         )
-        key = "${local.project_id}.tfstate"
+        key = "${local.project_id}/${coalesce(local.subproject, "default")}.tfstate"
         region = (
           contains(keys(local.config.providers), "aws") ?
           local.config.providers["aws"]["region"] : null
