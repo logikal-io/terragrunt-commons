@@ -104,7 +104,8 @@ locals {
       config = local.use_credentials && contains(keys(local.config.providers), "aws") ? {
         profile = local.organization_id
         region = local.config.providers["aws"]["region"]
-      } : {}
+        default_tags = lookup(local.config.providers["aws"], "default_tags", {})
+      } : { profile = null, region = null, default_tags = null }
     }
     github = {
       source = "integrations/github"
@@ -132,8 +133,14 @@ locals {
   provider_config_blocks = join("\n\n", [
     for provider in keys(local.config.providers) : join("\n", [
       "provider \"${provider}\" {", join("\n", [
-        for key, value in local.provider_config[provider].config : "  ${key} = \"${value}\""
-      ]), "}"
+        for key, value in local.provider_config[provider].config : (
+          key == "default_tags" ? join("\n", [
+            "  default_tags {",
+            "    tags = ${jsonencode(value)}",
+            "  }",
+          ]) : "  ${key} = ${jsonencode(value)}"
+        )
+      ]), "}",
     ])
   ])
 
