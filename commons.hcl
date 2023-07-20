@@ -105,7 +105,7 @@ locals {
         profile = local.organization_id
         region = local.config.providers["aws"]["region"]
         default_tags = lookup(local.config.providers["aws"], "default_tags", {})
-      } : { profile = null, region = null, default_tags = null }
+      } : {profile = null, region = null, default_tags = null}
     }
     github = {
       source = "integrations/github"
@@ -205,10 +205,10 @@ terraform {
   }
 }
 
-remote_state = merge(local.remote_state[local.backend], { disable_init = !local.use_credentials })
+remote_state = merge(local.remote_state[local.backend], {disable_init = !local.use_credentials})
 
 inputs = merge(
-  { for key, value in local.config : key => value if key != "providers" },
+  {for key, value in local.config : key => value if key != "providers"},
   {
     terragrunt_dir = get_terragrunt_dir()
     organization_id = local.organization_id
