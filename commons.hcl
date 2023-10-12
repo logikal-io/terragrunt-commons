@@ -87,6 +87,10 @@ locals {
 
   # Providers
   provider_config = {
+    local = {
+      source = "hashicorp/local"
+      config = {}
+    }
     random = {
       source = "hashicorp/random"
       config = {}
