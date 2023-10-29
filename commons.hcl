@@ -103,6 +103,14 @@ locals {
         region = local.config.providers["google"]["region"]
       } : {}
     }
+    google-beta = {
+      source = "hashicorp/google-beta"
+      config = local.use_credentials && contains(keys(local.config.providers), "google-beta") ? {
+        credentials = local.google_credentials
+        project = local.project_id
+        region = local.config.providers["google-beta"]["region"]
+      } : {}
+    }
     aws = {
       source = "hashicorp/aws"
       config = local.use_credentials && contains(keys(local.config.providers), "aws") ? {
