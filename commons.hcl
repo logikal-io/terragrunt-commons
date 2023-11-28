@@ -158,6 +158,10 @@ locals {
 
   # TFLint
   tflint_plugins = {
+    terraform = {
+      version = "0.5.0"
+      source = "github.com/terraform-linters/tflint-ruleset-terraform"
+    }
     google = {
       version = "0.24.0"
       source = "github.com/terraform-linters/tflint-ruleset-google"
@@ -256,6 +260,8 @@ generate "tflint_configuration" {
     }
     plugin "terraform" {
       enabled = true
+      version = "${local.tflint_plugins["terraform"]["version"]}"
+      source = "${local.tflint_plugins["terraform"]["source"]}"
       preset = "all"
     }
     ${local.tflint_plugin_blocks}
