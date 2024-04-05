@@ -77,6 +77,11 @@ locals {
         )
         encrypt = true
         dynamodb_table = "terraform-state-lock"
+
+        # Checks
+        skip_bucket_ssencryption = lookup(local.config, "skip_bucket_encryption_check", false)
+        skip_bucket_root_access = lookup(local.config, "skip_bucket_root_access_check", false)
+        skip_bucket_enforced_tls = lookup(local.config, "skip_bucket_enforced_tls_check", false)
       }
     }
     local = {
