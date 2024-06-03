@@ -27,7 +27,6 @@ locals {
   # Credentials
   use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
   google_credentials = "${local.config_home}/gcloud/credentials/${local.organization_id}.json"
-  github_credentials = "${local.config_home}/gh/hosts.yml"
   dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
 
   # Local module sources
@@ -127,7 +126,6 @@ locals {
     github = {
       source = "integrations/github"
       config = local.use_credentials && contains(keys(local.config.providers), "github") ? {
-        token = yamldecode(file(local.github_credentials))["github.com"]["oauth_token"]
         owner = local.organization_id
       } : {}
     }
