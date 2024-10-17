@@ -12,7 +12,9 @@ locals {
   ))
   subproject = lookup(local.config, "subproject", null)
   organization_id = replace(local.config.organization, ".", "-")
-  project_id = "${local.config.project}-${local.organization_id}"
+  project_id = join("-", compact(
+    [local.config.project, lookup(local.config, "namespace", null), local.organization_id]
+  ))
   cli_config = "${local.config_home}/terraform/${local.organization_id}.tf"
 
   # Commands
