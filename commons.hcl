@@ -164,15 +164,15 @@ locals {
   # TFLint
   tflint_plugins = {
     terraform = {
-      version = "0.5.0"
+      version = "0.10.0"
       source = "github.com/terraform-linters/tflint-ruleset-terraform"
     }
     google = {
-      version = "0.24.0"
+      version = "0.30.0"
       source = "github.com/terraform-linters/tflint-ruleset-google"
     }
     aws = {
-      version = "0.23.1"
+      version = "0.37.0"
       source = "github.com/terraform-linters/tflint-ruleset-aws"
     }
   }
