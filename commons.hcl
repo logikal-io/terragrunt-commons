@@ -30,6 +30,7 @@ locals {
   use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
   google_credentials = "${local.config_home}/gcloud/credentials/${local.organization_id}.json"
   dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
+  pagerduty_credentials = "${local.config_home}/pagerduty/credentials/${local.organization_id}.yml"
 
   # Local module sources
   # Note: working_dir is hardcoded because there seems to be no way to get this value
@@ -136,6 +137,18 @@ locals {
       config = (
         local.use_credentials && contains(keys(local.config.providers), "dnsimple") ?
         yamldecode(file(local.dnsimple_credentials)) : {}
+      )
+    }
+    pagerduty = {
+      source = "pagerduty/pagerduty"
+      config = (
+        local.use_credentials && contains(keys(local.config.providers), "pagerduty") ?
+        merge(
+          yamldecode(file(local.pagerduty_credentials)),
+          contains(keys(local.config.providers["pagerduty"]), "region") ? {
+            service_region = local.config.providers["pagerduty"]["region"]
+          } : {},
+        ) : {}
       )
     }
   }
