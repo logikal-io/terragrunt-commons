@@ -64,6 +64,9 @@ The credentials for the GitHub provider are extracted from the GitHub CLI user c
 The credentials for the DNSimple provider are read from
 ``$XDG_CONFIG_HOME/dnsimple/credentials/${organization_id}.yml``.
 
+The credentials for the PagerDuty provider are read from
+``$XDG_CONFIG_HOME/pagerduty/credentials/${organization_id}.yml``.
+
 Terraform CLI Configuration
 ---------------------------
 You can add organization-specific Terraform CLI configuration files under
