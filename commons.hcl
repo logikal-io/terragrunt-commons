@@ -32,12 +32,14 @@ locals {
   dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
   pagerduty_credentials = "${local.config_home}/pagerduty/credentials/${local.organization_id}.yml"
 
-  # Local module sources
+  # Module sources
   # Note: working_dir is hardcoded because there seems to be no way to get this value
   # programmatically (see https://github.com/gruntwork-io/terragrunt/issues/2283), additionally,
   # this logic fails when Terragrunt does not run in the cache folder and we can't check if it
   # exists either (see https://github.com/hashicorp/terraform/issues/25316)
+  use_local_module_sources = tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false))
   working_dir = ".terragrunt-cache/config_hash/module_hash"
+  modules = lookup(local.config, "modules", null)
   module_source_dir = "${local.config_home}/terragrunt/local-sources"
   module_source_groups = [
     for module_source_group in fileset(local.module_source_dir, "*.yml") :
@@ -212,8 +214,19 @@ terraform {
     }
   }
 
+  before_hook "add_module_versions" {
+    commands = !local.use_local_module_sources && local.modules != null ? local.all_commands : []
+    execute = flatten([
+      "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
+      join(";", [
+        for source, version in local.modules :
+          "s|(source = \")${source}//([^?]*)(\\?[^\"]*)*\"|\\1${source}//\\2?ref=${version}\"|g"
+      ]), "{}", ";",
+    ])
+  }
+
   before_hook "use_local_module_sources" {
-    commands = tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false)) ? local.all_commands : []
+    commands = local.use_local_module_sources ? local.all_commands : []
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
       join(";", [
