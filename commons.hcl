@@ -296,5 +296,11 @@ generate "tflint_configuration" {
       preset = "all"
     }
     ${local.tflint_plugin_blocks}
+    rule "terraform_documented_variables" {
+      enabled = false
+    }
+    rule "terraform_documented_outputs" {
+      enabled = false
+    }
   EOT
 }
