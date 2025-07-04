@@ -39,7 +39,7 @@ locals {
   # exists either (see https://github.com/hashicorp/terraform/issues/25316)
   use_local_module_sources = tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false))
   working_dir = ".terragrunt-cache/config_hash/module_hash"
-  modules = lookup(local.config, "modules", null)
+  modules = lookup(local.config, "modules", {})
   module_source_dir = "${local.config_home}/terragrunt/local-sources"
   module_source_groups = [
     for module_source_group in fileset(local.module_source_dir, "*.yml") :
@@ -215,7 +215,9 @@ terraform {
   }
 
   before_hook "add_module_versions" {
-    commands = !local.use_local_module_sources && local.modules != null ? local.all_commands : []
+    commands = (
+      !local.use_local_module_sources && length(local.modules) > 0 ? local.all_commands : []
+    )
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
       join(";", [
