@@ -27,7 +27,7 @@ locals {
   ]
 
   # Credentials
-  use_credentials = tobool(get_env("TERRAGRUNT_USE_CREDENTIALS", true))
+  use_credentials = tobool(get_env("TG_COMMONS_USE_CREDENTIALS", true))
   google_credentials = "${local.config_home}/gcloud/credentials/${local.organization_id}.json"
   dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
   pagerduty_credentials = "${local.config_home}/pagerduty/credentials/${local.organization_id}.yml"
@@ -37,7 +37,7 @@ locals {
   # programmatically (see https://github.com/gruntwork-io/terragrunt/issues/2283), additionally,
   # this logic fails when Terragrunt does not run in the cache folder and we can't check if it
   # exists either (see https://github.com/hashicorp/terraform/issues/25316)
-  use_local_module_sources = tobool(get_env("TERRAGRUNT_USE_LOCAL_SOURCES", false))
+  use_local_module_sources = tobool(get_env("TG_COMMONS_USE_LOCAL_SOURCES", false))
   working_dir = ".terragrunt-cache/config_hash/module_hash"
   modules = lookup(local.config, "modules", {})
   module_source_dir = "${local.config_home}/terragrunt/local-sources"
@@ -80,7 +80,7 @@ locals {
           local.config.providers["aws"]["region"] : null
         )
         encrypt = true
-        dynamodb_table = "terraform-state-lock"
+        use_lockfile = true
 
         # Checks
         skip_bucket_ssencryption = lookup(local.config, "skip_bucket_encryption_check", false)
