@@ -1,251 +1,174 @@
-# Terragrunt configuration
 locals {
-  # Versions
-  terragrunt_version = trimspace(file("${get_terragrunt_dir()}/.terragrunt-version"))
-  terraform_version = trimspace(file("${get_terragrunt_dir()}/.terraform-version"))
-
   # Configuration
-  child_config = read_terragrunt_config("${get_terragrunt_dir()}/config.hcl").locals
-  config = merge(lookup(local.child_config, "parent", {}), local.child_config)
-  config_home = pathexpand(trimsuffix(
-    get_env("XDG_CONFIG_HOME", "${trimsuffix(get_env("HOME"), "/")}/.config"), "/",
-  ))
-  subproject = lookup(local.config, "subproject", null)
+  _child_config = read_terragrunt_config("${get_terragrunt_dir()}/config.hcl")
+  _parent_config = lookup(local._child_config.locals, "config", {})
+  config = merge(lookup(local._parent_config, "locals", {}), local._child_config.locals)
+  providers = lookup(local.config, "providers", {})
+
+  organization = local.config.organization
   organization_id = replace(local.config.organization, ".", "-")
-  project_id = join("-", compact(
-    [local.config.project, lookup(local.config, "namespace", null), local.organization_id]
-  ))
-  cli_config = "${local.config_home}/terraform/${local.organization_id}.tf"
+  namespace = lookup(local.config, "namespace", null)
+  project = lookup(local.config, "project", null)
+  project_id = join("-", compact([local.project, local.namespace, local.organization_id]))
+  subproject = lookup(local.config, "subproject", null)
+
+  local_mode = tobool(get_env("TG_COMMONS_LOCAL_MODE", false))
+
+  # System
+  _home = trimsuffix(get_env("HOME", "~"), "/")
+  _config_home = pathexpand(trimsuffix(get_env("XDG_CONFIG_HOME", "${local._home}/.config"), "/"))
+  _credentials = {
+    google = "${local._config_home}/gcloud/credentials/${local.organization_id}.json"
+    dnsimple = "${local._config_home}/dnsimple/credentials/${local.organization_id}.yml"
+    pagerduty = "${local._config_home}/pagerduty/credentials/${local.organization_id}.yml"
+  }
+
+  # Versions
+  _terragrunt_version = trimspace(file("${get_terragrunt_dir()}/.terragrunt-version"))
+  _terraform_version = trimspace(file("${get_terragrunt_dir()}/.terraform-version"))
+  _generate_terraform_version = lookup(local.config, "generate_terraform_version", true)
 
   # Commands
-  all_commands = [
-      # Main commands
-      "init", "validate", "plan", "apply", "destroy",
-      # Other commands
-      "console", "fmt", "force-unlock", "get", "graph", "import", "login", "logout", "output",
-      "providers", "refresh", "show", "state", "taint", "test", "untaint", "workspace",
+  _all_commands = [
+    # Main commands
+    "init", "validate", "plan", "apply", "destroy",
+    # Other commands
+    "force-unlock", "import", "output", "refresh", "show", "state", "test",
   ]
 
-  # Credentials
-  use_credentials = tobool(get_env("TG_COMMONS_USE_CREDENTIALS", true))
-  google_credentials = "${local.config_home}/gcloud/credentials/${local.organization_id}.json"
-  dnsimple_credentials = "${local.config_home}/dnsimple/credentials/${local.organization_id}.yml"
-  pagerduty_credentials = "${local.config_home}/pagerduty/credentials/${local.organization_id}.yml"
-
-  # Module sources
-  # Note: working_dir is hardcoded because there seems to be no way to get this value
-  # programmatically (see https://github.com/gruntwork-io/terragrunt/issues/2283), additionally,
-  # this logic fails when Terragrunt does not run in the cache folder and we can't check if it
-  # exists either (see https://github.com/hashicorp/terraform/issues/25316)
-  use_local_module_sources = tobool(get_env("TG_COMMONS_USE_LOCAL_SOURCES", false))
-  working_dir = ".terragrunt-cache/config_hash/module_hash"
-  modules = lookup(local.config, "modules", {})
-  module_source_dir = "${local.config_home}/terragrunt/local-sources"
-  module_source_groups = [
-    for module_source_group in fileset(local.module_source_dir, "*.yml") :
-      yamldecode(file("${local.module_source_dir}/${module_source_group}"))
+  # Local modules
+  _use_local_modules = tobool(get_env("TG_COMMONS_USE_LOCAL_MODULES", false))
+  _modules = lookup(local.config, "modules", {})
+  _module_source_dir = "${local._config_home}/terragrunt/local-modules"
+  _module_source_groups = [
+    for module_source_group in fileset(local._module_source_dir, "*.yml") :
+    yamldecode(file("${local._module_source_dir}/${module_source_group}"))
   ]
-  module_sources = {
-    for remote_source, local_source in merge(local.module_source_groups...) :
+  _module_sources = {
+    for remote_source, local_source in merge(local._module_source_groups...) :
       remote_source => run_cmd(
-        "--terragrunt-quiet",
-        "realpath", "-m", "--relative-to=${local.working_dir}", pathexpand(local_source)
+        "--terragrunt-quiet", "realpath", "-m",
+        "--relative-to=.terragrunt-cache/config_hash/module_hash", pathexpand(local_source),
       )
   }
 
   # Remote state backends
-  remote_state = {
-    gcs = {
-      backend = "gcs"
-      config = contains(keys(local.config.providers), "google") ? {
-        credentials = local.google_credentials
-        project = local.project_id
-        bucket = "terraform-state-${local.project_id}"
-        location = local.config.providers["google"]["region"]
-        prefix = "/${local.subproject != null ? local.subproject : ""}"
-      } : {}
-    }
+  _state_backend_config = {
+    gcs = contains(keys(local.providers), "google") ? {
+      credentials = local._credentials.google
+      project = local.project_id
+      bucket = "terraform-state-${local.project_id}"
+      location = local.providers["google"]["region"]
+      prefix = "/${local.subproject != null ? local.subproject : ""}"
+    } : {}
     s3 = {
-      backend = "s3"
-      config = {
-        profile = local.organization_id
-        bucket = (
-          contains(keys(local.config.providers), "aws") ?
-          "terraform-state-${local.config.providers["aws"]["region"]}-${local.organization_id}" :
-          null
-        )
-        key = "${local.project_id}/${coalesce(local.subproject, "default")}.tfstate"
-        region = (
-          contains(keys(local.config.providers), "aws") ?
-          local.config.providers["aws"]["region"] : null
-        )
-        encrypt = true
-        use_lockfile = true
-
-        # Checks
-        skip_bucket_ssencryption = lookup(local.config, "skip_bucket_encryption_check", false)
-        skip_bucket_root_access = lookup(local.config, "skip_bucket_root_access_check", false)
-        skip_bucket_enforced_tls = lookup(local.config, "skip_bucket_enforced_tls_check", false)
-      }
-    }
-    local = {
-      backend = "local"
+      profile = local.organization_id
+      bucket = (
+        contains(keys(local.providers), "aws") ?
+        "terraform-state-${local.providers["aws"]["region"]}-${local.organization_id}" :
+        null
+      )
+      key = "${local.project_id}/${coalesce(local.subproject, "default")}.tfstate"
+      region = (
+        contains(keys(local.providers), "aws") ?
+        local.providers["aws"]["region"] : null
+      )
+      encrypt = true
+      use_lockfile = true
     }
   }
-  backend = local.use_credentials ? local.config.backend : "local"
+  _state_backend = local.local_mode ? "local" : local.config.state_backend
 
   # Providers
-  provider_config = {
-    local = {
-      source = "hashicorp/local"
-      config = {}
-    }
-    random = {
-      source = "hashicorp/random"
-      config = {}
-    }
+  _provider_config = {
     google = {
       source = "hashicorp/google"
-      config = local.use_credentials && contains(keys(local.config.providers), "google") ? {
-        credentials = local.google_credentials
+      config = !local.local_mode && contains(keys(local.providers), "google") ? {
+        credentials = local._credentials.google
         project = local.project_id
-        region = local.config.providers["google"]["region"]
+        region = local.providers["google"]["region"]
       } : {}
     }
     google-beta = {
       source = "hashicorp/google-beta"
-      config = local.use_credentials && contains(keys(local.config.providers), "google-beta") ? {
-        credentials = local.google_credentials
+      config = !local.local_mode && contains(keys(local.providers), "google-beta") ? {
+        credentials = local._credentials.google
         project = local.project_id
-        region = local.config.providers["google-beta"]["region"]
+        region = local.providers["google-beta"]["region"]
       } : {}
     }
     aws = {
       source = "hashicorp/aws"
-      config = local.use_credentials && contains(keys(local.config.providers), "aws") ? {
+      config = !local.local_mode && contains(keys(local.providers), "aws") ? {
         profile = local.organization_id
-        region = local.config.providers["aws"]["region"]
-        default_tags = lookup(local.config.providers["aws"], "default_tags", {})
+        region = local.providers["aws"]["region"]
+        default_tags = lookup(local.providers["aws"], "default_tags", {})
       } : {profile = null, region = null, default_tags = null}
     }
     github = {
       source = "integrations/github"
-      config = local.use_credentials && contains(keys(local.config.providers), "github") ? {
+      config = !local.local_mode && contains(keys(local.providers), "github") ? {
         owner = local.organization_id
       } : {}
     }
     dnsimple = {
       source = "dnsimple/dnsimple"
       config = (
-        local.use_credentials && contains(keys(local.config.providers), "dnsimple") ?
-        yamldecode(file(local.dnsimple_credentials)) : {}
+        !local.local_mode && contains(keys(local.providers), "dnsimple") ?
+        yamldecode(file(local._credentials.dnsimple)) : {}
       )
     }
     pagerduty = {
       source = "pagerduty/pagerduty"
       config = (
-        local.use_credentials && contains(keys(local.config.providers), "pagerduty") ?
-        merge(
-          yamldecode(file(local.pagerduty_credentials)),
-          contains(keys(local.config.providers["pagerduty"]), "region") ? {
-            service_region = local.config.providers["pagerduty"]["region"]
-          } : {},
-        ) : {}
+        !local.local_mode && contains(keys(local.providers), "pagerduty") ?
+        yamldecode(file(local._credentials.pagerduty)) : {}
       )
     }
   }
-  provider_blocks = trimspace(join("", [
-    for provider, settings in local.config.providers : <<EOT
-    ${provider} = {
-      source = "${local.provider_config[provider].source}"
-      version = "${settings["version"]}"
-    }
-    EOT
-  ]))
-  provider_config_blocks = join("\n\n", [
-    for provider in keys(local.config.providers) : join("\n", [
-      "provider \"${provider}\" {", join("\n", [
-        for key, value in local.provider_config[provider].config : (
-          key == "default_tags" ? join("\n", [
-            "  default_tags {",
-            "    tags = ${jsonencode(value)}",
-            "  }",
-          ]) : "  ${key} = ${jsonencode(value)}"
-        )
-      ]), "}",
-    ])
-  ])
 
   # TFLint
-  tflint_plugins = {
+  _tflint_plugins = {
     terraform = {
-      version = "0.10.0"
       source = "github.com/terraform-linters/tflint-ruleset-terraform"
+      version = "0.13.0"
+      preset = "all"
     }
     google = {
-      version = "0.30.0"
       source = "github.com/terraform-linters/tflint-ruleset-google"
+      version = "0.37.1"
     }
     aws = {
-      version = "0.37.0"
       source = "github.com/terraform-linters/tflint-ruleset-aws"
+      version = "0.44.0"
     }
   }
-  tflint_plugin_blocks = trimspace(join("", [
-    for plugin, settings in local.tflint_plugins : <<-EOT
-    plugin "${plugin}" {
-      enabled = true
-      version = "${settings["version"]}"
-      source = "${settings["source"]}"
-    }
-    EOT
-    if contains(keys(local.config.providers), plugin)
-  ]))
 }
 
 terraform {
   source = "${path_relative_from_include()}///"
   include_in_copy = [".terraform-version"]
 
-  extra_arguments "cli_config_file" {
-    commands = fileexists(local.cli_config) ? local.all_commands : []
-    env_vars = {
-      TF_CLI_CONFIG_FILE = local.cli_config
-    }
-  }
-
   before_hook "add_module_versions" {
-    commands = (
-      !local.use_local_module_sources && length(local.modules) > 0 ? local.all_commands : []
-    )
+    commands = !local._use_local_modules && length(local._modules) > 0 ? local._all_commands : []
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
       join(";", [
-        for source, version in local.modules :
+        for source, version in local._modules :
           "s|(source = \")${source}//([^?]*)(\\?[^\"]*)*\"|\\1${source}//\\2?ref=${version}\"|g"
       ]), "{}", ";",
     ])
   }
 
-  before_hook "use_local_module_sources" {
-    commands = local.use_local_module_sources ? local.all_commands : []
+  before_hook "use_local_modules" {
+    commands = local._use_local_modules ? local._all_commands : []
     execute = flatten([
       "find", ".", "-name", "*.tf", "-execdir", "sed", "-E", "-i",
       join(";", [
-        for remote_source, local_source in local.module_sources :
-          "s|(source = \")${remote_source}//([^?]*)(\\?[^\"]*)*\"|\\1${local_source}/\\2\"|g"
+        for remote_source, local_source in local._module_sources :
+        "s|(source = \")${remote_source}//([^?]*)(\\?[^\"]*)*\"|\\1${local_source}/\\2\"|g"
       ]), "{}", ";",
     ])
-  }
-
-  before_hook "validate" {
-    commands = ["validate"]
-    execute = ["true"]
-  }
-
-  after_hook "tflint_init" {
-    commands = ["validate"]
-    execute = ["tflint", "--init"]
   }
 
   after_hook "tflint" {
@@ -254,55 +177,41 @@ terraform {
   }
 }
 
-remote_state = merge(local.remote_state[local.backend], {disable_init = !local.use_credentials})
+remote_state {
+  backend = local._state_backend
+  config = merge(
+    lookup(local._state_backend_config, local._state_backend, {}),
+    lookup(local.config, "state_backend_config", {}),
+  )
+  disable_init = local.local_mode || local._state_backend == "local"
+}
+
+terragrunt_version_constraint = "= ${local._terragrunt_version}"
+terraform_version_constraint = "= ${local._terraform_version}"
 
 inputs = merge(
-  {for key, value in local.config : key => value if key != "providers"},
-  {
-    terragrunt_dir = get_terragrunt_dir()
-    organization_id = local.organization_id
-    project_id = local.project_id
-  }
+  lookup(local._parent_config, "inputs", {}),
+  lookup(local._child_config, "inputs", {}),
 )
 
-terragrunt_version_constraint = "= ${local.terragrunt_version}"
-terraform_version_constraint = "= ${local.terraform_version}"
-
-# Terraform and TFLint configuration
+# Terraform configuration
 generate "providers" {
   path = "providers.tf"
   if_exists = "overwrite"
-  contents = <<-EOT
-    terraform {
-      backend "${local.backend}" {}
-      required_version = "= ${local.terraform_version}"
-      required_providers {
-        ${local.provider_blocks}
-      }
-    }
-
-    ${local.provider_config_blocks}
-  EOT
+  contents = templatefile("providers.tf", {
+    state_backend = local._state_backend
+    terraform_version = local._generate_terraform_version ? local._terraform_version : null
+    providers = local.providers
+    default_provider_config = local._provider_config
+  })
 }
+
+# TFLint configuration
 generate "tflint_configuration" {
   path = ".tflint.hcl"
   if_exists = "overwrite"
-  contents = <<-EOT
-    config {
-      module = true
-    }
-    plugin "terraform" {
-      enabled = true
-      version = "${local.tflint_plugins["terraform"]["version"]}"
-      source = "${local.tflint_plugins["terraform"]["source"]}"
-      preset = "all"
-    }
-    ${local.tflint_plugin_blocks}
-    rule "terraform_documented_variables" {
-      enabled = false
-    }
-    rule "terraform_documented_outputs" {
-      enabled = false
-    }
-  EOT
+  contents = templatefile("tflint.hcl", {
+    plugins = local._tflint_plugins
+    providers = concat(keys(local.providers), lookup(local.config, "tflint_providers", []))
+  })
 }
