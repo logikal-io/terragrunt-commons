@@ -131,16 +131,16 @@ locals {
   _tflint_plugins = {
     terraform = {
       source = "github.com/terraform-linters/tflint-ruleset-terraform"
-      version = "0.13.0"
+      version = "0.14.1"
       preset = "all"
     }
     google = {
       source = "github.com/terraform-linters/tflint-ruleset-google"
-      version = "0.37.1"
+      version = "0.38.0"
     }
     aws = {
       source = "github.com/terraform-linters/tflint-ruleset-aws"
-      version = "0.44.0"
+      version = "0.45.0"
     }
   }
 }
@@ -178,7 +178,7 @@ terraform {
 
   after_hook "tflint" {
     commands = ["validate"]
-    execute = ["/usr/local/bin/tflint", "--color", "--config", ".tflint.hcl"]
+    execute = ["/usr/local/bin/tflint", "--color", "--config", ".tflint.json"]
   }
 }
 
@@ -213,10 +213,21 @@ generate "providers" {
 
 # TFLint configuration
 generate "tflint_configuration" {
-  path = ".tflint.hcl"
+  path = ".tflint.json"
   if_exists = "overwrite"
-  contents = templatefile("tflint.hcl", {
-    plugins = local._tflint_plugins
-    providers = concat(keys(local.providers), lookup(local.config, "tflint_providers", []))
+  disable_signature = true
+  contents = jsonencode({
+    "plugin": {
+      for plugin, plugin_config in local._tflint_plugins :
+      plugin => merge({"enabled": true}, plugin_config)
+      if plugin == "terraform" || contains(
+        concat(keys(local.providers), lookup(local.config, "tflint_providers", [])),
+        plugin,
+      )
+    }
+    "rule": {
+      "terraform_documented_variables": {"enabled": false},
+      "terraform_documented_outputs": {"enabled": false},
+    }
   })
 }
