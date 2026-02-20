@@ -171,9 +171,14 @@ terraform {
     ])
   }
 
+  after_hook "tflint_init" {
+    commands = ["validate"]
+    execute = ["/usr/local/bin/tflint", "--color", "--init"]
+  }
+
   after_hook "tflint" {
     commands = ["validate"]
-    execute = ["tflint", "--color"]
+    execute = ["/usr/local/bin/tflint", "--color", "--config", ".tflint.hcl"]
   }
 }
 
@@ -183,7 +188,7 @@ remote_state {
     lookup(local._state_backend_config, local._state_backend, {}),
     lookup(local.config, "state_backend_config", {}),
   )
-  disable_init = local.local_mode || local._state_backend == "local"
+  disable_init = local.local_mode
 }
 
 terragrunt_version_constraint = "= ${local._terragrunt_version}"

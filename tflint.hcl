@@ -1,7 +1,3 @@
-config {
-  call_module_type = "all"
-}
-
 # Plugins
 %{for plugin, plugin_config in plugins~}
   %{if plugin == "terraform" || contains(providers, plugin)~}
@@ -18,6 +14,7 @@ config {
 rule "terraform_documented_variables" {
   enabled = false
 }
+
 rule "terraform_documented_outputs" {
   enabled = false
 }
