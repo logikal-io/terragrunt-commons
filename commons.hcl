@@ -136,11 +136,11 @@ locals {
     }
     google = {
       source = "github.com/terraform-linters/tflint-ruleset-google"
-      version = "0.38.0"
+      version = "0.39.0"
     }
     aws = {
       source = "github.com/terraform-linters/tflint-ruleset-aws"
-      version = "0.45.0"
+      version = "0.47.0"
     }
   }
 }
