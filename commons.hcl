@@ -131,7 +131,7 @@ locals {
   _tflint_plugins = {
     terraform = {
       source = "github.com/terraform-linters/tflint-ruleset-terraform"
-      version = "0.14.1"
+      version = "0.15.0"
       preset = "all"
     }
     google = {
@@ -188,7 +188,7 @@ remote_state {
     lookup(local._state_backend_config, local._state_backend, {}),
     lookup(local.config, "state_backend_config", {}),
   )
-  disable_init = local.local_mode
+  disable_init = local._state_backend == "local"
 }
 
 terragrunt_version_constraint = "= ${local._terragrunt_version}"
